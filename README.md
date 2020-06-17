@@ -117,7 +117,7 @@ Some days I really enjoy living in the future.
 How to deploy my own Make The World
 ===================================
 
-Ready to take the plunge?  Okay, we'll make this as easy for you as possible.
+Ready to take the plunge?  Okay, we'll make this as easy for you as possible.  Be ready to spend a few hours on this process.
 
 #### Setting up an AWS account
 
@@ -154,6 +154,9 @@ will generally cost a few dollars a month to run, if that. Like, under $5 USD/mo
 wherever possible, and avoid any choices (particularly Support Plan) that would add costs.  You just want to pay for some computer power, not buy all their
 digital bric-a-brac.
 
+It can look like you’re all set when you still have two steps left: when you have the choice between Root and IAM (Identity and Access Management}, choose Root,
+and click the big orange button at the top right that says “Sign in to the Console”
+
 ##### 2/8: Create a Budget
 
 Next thing:  You just gave your credit card information to a system that bills you as you go, and creates resources to bill you for in ways that can be
@@ -163,12 +166,14 @@ you in a month ... after which it will just cut you off.  It's unlikely you'll e
 [Make an AWS Budget](documentation/budget/budget.md)
 
 At the end of those two steps, you should have one account that you still log in to with its root credentials.  You'll need that, long-term, in order to check
-out the Budget, but those credentials can do *anything*.  You want to log in with those very, very seldom.
+out the Budget, but those credentials can do *anything*.  Using it is like walking around with in an ADMIN account in a MUSH; avoid it unless you need those
+powers specifially. You want to log in that way very, very seldom.
 
 ##### 3/8: Create an IAM Role
 
 AWS provides a tool called *IAM* (Identity and Access Management) that lets you create a user that is still provisioned to do *almost* anything but is importantly
-firewalled away from billing matters.  Do that next (the top part ... you don't need the second bit where they show you an alternate path to do the same thing):
+firewalled away from billing matters.  It's best not to login with higher-level authorization than you need, to avoid problems. Especially money problems.  Do that
+next (the top part ... you don't need the second bit where they show you an alternate path to do the same thing):
 
 [Make your first IAM user and Administrator Group](documentation/iamRole.md)
 
@@ -184,20 +189,19 @@ rather than a person) that holds the permissions you want to grant to Amplify (b
 
 [Add a service role](documentation/serviceRole.md)
 
-##### 5/8: Create a GitHub account
+##### 5/8: Configure a GitHub account
 
-When AWS deploys, it will want to do so from *your* GitHub account ... it will clone this repository into your space, so that you control the version
-of the code that it is running off of.  So if you don't already have a GitHub account, you will need to sign up for one.  Fortunately, it’s super easy
-compared to what you’ve done so far:
+When AWS deploys, it will want to do so from *your* GitHub account ... it will read code from your space, so that you control precisely what it is running off of.
+So the next step is to configure a GitHub account with the code you will need:
 
-[Sign up for GitHub](https://www.wikihow.com/Create-an-Account-on-GitHub)
+[Configure GitHub](documentation/github.md)
 
 ##### 6/8: Deploy the system
 
-Now that you have both an AWS account and a GitHub account, you can ask the AWS Amplify to clone this repository into your GitHub account and
-then instantiate Make The World from the code you copied
+Now that you have both an AWS account and a GitHub account with the correct code, you can ask the AWS Amplify service to use that code in order to instantiate
+a Make The World instance:
 
-[Deploy Make The World](documentation/deploy.md)
+[Deploy Make The World](documentation/deploy/deploy.md)
 
 ##### 7/8: Protect your cloud resources
 
@@ -251,6 +255,41 @@ import content, all that.  You should also now have the ability to make not just
 
 Good luck!
 
+##### 9/8: (Optional) Make your environment more robust
+
+Make The World uses AWS Cognito to handle its sign-up and sign-in functionality.  And AWS Cognito (by default) uses a test email address to send out validation
+emails giving people the code they'll need to sign up.  Amazon limits the number of emails it is willing to send from such test email addresses, to no more than 50 per
+day.  If you expect to have people signing up at a faster pace than that, you will want to register an email you *already control* with AWS, telling AWS that it
+can send emails on your behalf from that address.  Once you do that, Amazon will happily send many hundreds of emails per day.
+
+1. Go to AWS's [Simple Email Service](https://console.aws.amazon.com/ses)
+
+2. Select "Email Addresses" (under "Identity Management") in the side bar at left.
+
+3. Select "Verify a New Email Address"
+
+4. Enter the address you want to verify.
+
+5. Check that address for a verification email.
+
+6. Respond to the verification email.
+
+7. Once the AWS console agrees that the address has been verified as one you control, navigate to [Cognito User Pools](https://console.aws.amazon.com/cognito/users/)
+
+8. Select the User Pool that corresponds to the application you wish to raise limits on
+
+9. In the menu on the left side, select "Message customizations" under "General Settings".
+
+10. Where it says "Do you want to send emails through your Amazon SES Configuration?" select "Yes".
+
+11. Fill in your email address on *both* the "From email address ARN" and "From email address" fields.
+
+##### 10/8: (Optional) Mount a second (or third) MTW instance in the same account
+
+After you've mounted one MTW instance, it is much simpler to mount more:
+
+[Mount a second instance](/documentation/secondBranch/secondBranch.md)
+
 ### Manual deployment for development
 
 If you want to tweak the software behind Make The World, make it your own, maybe do better than us ... have at!  Sounds great.  You'll want to clone this
@@ -264,7 +303,7 @@ First, deploy the permanent storage stack for the world (with fictitious paramet
 aws cloudformation deploy \
     --template-file .\permanentsTemplate.yaml \
     --stack-name (your chosen prefix)PermanentsStack \
-    --parameter-overrides AppID=(some fiction like '1234', but more random ... it cannot conflict with anyone else in the world)
+    --parameter-overrides TablePrefix=(your chosen prefix) AppID=(some fiction like '1234', but more random ... it cannot conflict with anyone else in the world)
     --capabilities CAPABILITY_IAM
 ```
 
@@ -286,6 +325,17 @@ aws cloudformation describe-stacks \
     --stack-name (your stack name) --query 'Stacks[].Outputs'
 ```
 
+If you have changed the GraphQL schema that runs the data back-end, you will need to update the generated graphQL libraries in the charcoal client
+(NOTE:  The first time, you will also need to run "amplify codegen add", to tell your local development stack that you're using amplify codegen
+to keep your graphQL libraries up to date with changes)
+
+```
+cd charcoal-client
+
+aws appsync get-introspection-schema --api-id (your appsync API ID) --format JSON schema.json
+amplify codegen
+```
+
 #### Deploying separate development stacks
 
 If you want to have multiple stacks running simultaneously (for dev and staging, for instance), you can do that too.  Create a separate stack by running
@@ -297,7 +347,7 @@ aws cloudformation deploy \
     --template-file .\permanentsTemplate.yaml \
     --stack-name (new prefix)PermanentsStack \
     --capabilities CAPABILITY_IAM \
-    --parameter-overrides TablePrefix=(something other than mtw) AppID=(some new fiction)
+    --parameter-overrides TablePrefix=(new prefix) AppID=(some new fiction)
 ```
 
 Next deploy the running application stack:
@@ -329,12 +379,16 @@ it can be started against the back-end.
 You've tinkered around, and decided this isn't something you want to keep maintaining long-term?  No problem.  It's pretty easy to remove from
 the AWS console.
 
-Go to Amplify:  Select your app, and delete it.
+IMPORTANT NOTE:  This process will delete all of your cloud resources.  By default, **backups** are stored in the Make The World cloud resources,
+and will be deleted when you do this.  If you intend to keep the content of your instance, you need to have created a backup and *downloaded it*
+to a local machine, before you do this.
 
-Go to S3:  There is a permanentstack storage bucket there.  It has all your backups, so maybe copy those down if you want to keep them for sentimental
+1. Go to Amplify:  Select your app, and delete it.
+
+2. Go to S3:  There is a permanentstack storage bucket there.  It has all your backups, so maybe copy those down if you want to keep them for sentimental
 (or other) reasons.  When you're sure you don't need the data any more, select the bucket and click the 'Empty' button.
 
-Go to CloudFormaton:  There are two stacks there (one for permanents and one for everything else).  Click the 'everything else' stack and delete it.
+3. Go to CloudFormaton:  There are two stacks there (one for permanents and one for everything else).  Click the 'everything else' stack and delete it.
 Once that is complete, click the permanents stack and delete it.
 
 That's it:  Make The World should be removed completely from your AWS account.
